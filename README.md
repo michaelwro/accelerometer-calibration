@@ -26,7 +26,7 @@ $ pip3 install numpy matplotlib pandas  # pip for Windows
 
 ---
 
-**IMPORTANT:** Before following these steps, I highly recommend watching the video I created about this process. You can watch it [at this link.]()
+**IMPORTANT:** Before following these steps, I highly recommend watching the video I created about this process. You can watch it [at this link](https://www.youtube.com/watch?v=-1tmYPE7MAQ).
 
 ## Step 1: Output Comma-Separated Data
 
@@ -62,6 +62,6 @@ Open `plot-calibration-data.py` in a text editor. Copy the A^-1 matrix and bias 
 ## Resources
 
 * [Magneto download link](https://sites.google.com/site/sailboatinstruments1/home)
-* [YouTube vide]()
+* [YouTube video](https://www.youtube.com/watch?v=-1tmYPE7MAQ)
 * [GitHub code repo](https://github.com/michaelwro/accelerometer-calibration)
 
