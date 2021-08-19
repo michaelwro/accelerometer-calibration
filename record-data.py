@@ -19,11 +19,11 @@ import serial
 
 
 # global variables
-MAX_MEAS = 200  # max number of readings, so that we don't create an infinite loop
-AVG_MEAS = 25  # number of measurements to take the average of
+MAX_MEAS = 200  # max number of readings in the session, so that we don't create an infinite loop
+AVG_MEAS = 25  # for each reading, take this many measurements and average them
 SER_PORT = 'COM4'  # serial port the device is connected to
 SER_BAUD = 115200  # serial port baud rate
-FILENAME = os.path.join(os.getcwd(), 'testdata.txt')
+FILENAME = os.path.join(os.getcwd(), 'acceldata.txt')  # output file
 
 
 class SerialPort:
@@ -32,6 +32,7 @@ class SerialPort:
     Attributes:
         read(**kwargs): Read and decode data string from serial port.
     """
+
     def __init__(self, port, baud=9600):
         """Create and read serial data.
 
@@ -49,18 +50,18 @@ class SerialPort:
         self.baud = baud
 
         # Initialize serial connection
-        self.ser = serial.Serial(self.port, self.baud, timeout=None, xonxoff=False, rtscts=False, dsrdtr=False)
+        self.ser = serial.Serial(
+            self.port, self.baud, timeout=None, xonxoff=False, rtscts=False, dsrdtr=False)
         self.ser.flushInput()
         self.ser.flushOutput()
-    
 
-    def Read(self, clean_end=True):
+    def Read(self, clean_end=True) -> str:
         """
         Read and decode data string from serial port.
 
         Args:
             clean_end (bool): Strip '\\r' and '\\n' characters from string. Common if used Serial.println() Arduino function. Default true
-        
+
         Returns:
             (str): utf-8 decoded message.
         """
@@ -69,18 +70,16 @@ class SerialPort:
         decodedMsg = bytesToRead.decode('utf-8')
 
         if clean_end == True:
-            decodedMsg = decodedMsg.rstrip()  # strip('\r').strip('\n')  # Strip extra chars at the end
-        
-        return decodedMsg
-    
+            decodedMsg = decodedMsg.rstrip()  # Strip extra chars at the end
 
-    def Close(self):
+        return decodedMsg
+
+    def Close(self) -> None:
         """Close serial connection."""
         self.ser.close()
 
 
-
-def RecordDataPt(ser:SerialPort):
+def RecordDataPt(ser: SerialPort) -> tuple:
     """Record data from serial port and return averaged result."""
     # do a few readings and average the result
     ax = ay = az = 0.0
@@ -92,29 +91,26 @@ def RecordDataPt(ser:SerialPort):
             ax_now = float(data[0])
             ay_now = float(data[1])
             az_now = float(data[2])
-            # print(data)
         except:
             ser.Close()
             raise SystemExit("[ERROR]: Error reading serial connection.")
         ax += ax_now
         ay += ay_now
         az += az_now
-    
+
     return (ax / AVG_MEAS, ay / AVG_MEAS, az / AVG_MEAS)
 
 
-
-def List2DelimFile(mylist:list, filename:str, delimiter:str=','):
+def List2DelimFile(mylist: list, filename: str, delimiter: str = ',', f_mode='a') -> None:
     """Convert list to Pandas dataframe, then save as a text file."""
     df = pandas.DataFrame(mylist)
     df.to_csv(
         filename,  # path and filename
         sep=delimiter,
-        mode='a',
+        mode=f_mode,
         header=False,  # no col. labels
         index=False  # no row numbers
     )
-
 
 
 def main():
@@ -126,12 +122,14 @@ def main():
 
     # take measurements
     for _ in range(MAX_MEAS):
-        user = input('[INPUT]: Ready for measurement? Type \'m\' to measure or \'q\' to save and quit: ').lower()
+        user = input(
+            '[INPUT]: Ready for measurement? Type \'m\' to measure or \'q\' to save and quit: ').lower()
         if user == 'm':
             # record data to list
             ax, ay, az = RecordDataPt(ser)
             magn = math.sqrt(ax**2 + ay**2 + az**2)
-            print('[INFO]: Avgd Readings: {:.4f}, {:.4f}, {:.4f} Magnitude: {:.4f}'.format(ax, ay, az, magn))
+            print('[INFO]: Avgd Readings: {:.4f}, {:.4f}, {:.4f} Magnitude: {:.4f}'.format(
+                ax, ay, az, magn))
             data.append([ax, ay, az])
         elif user == 'q':
             # save, then quit
@@ -146,13 +144,11 @@ def main():
             ser.Close()
             return
 
-    
     # save once max is reached
     print('[WARNING]: Reached max. number of datapoints, saving file...')
     List2DelimFile(data, FILENAME, delimiter='\t')
     ser.Close()
     print('[INFO]: Done!')
-
 
 
 if __name__ == '__main__':

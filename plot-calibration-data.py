@@ -30,13 +30,16 @@ import matplotlib.pyplot as plt
 
 
 # Define calibration parameters
-A = np.array(   [[1.004332, 0.000046, 0.004896],
-                [0.000046, 0.969793, 0.009452],
-                [0.004896, 0.009452, 1.022384]])
+A = np.array([[1.004332, 0.000046, 0.004896],  # 'A^-1' matrix from Magneto
+              [0.000046, 0.969793, 0.009452],
+              [0.004896, 0.009452, 1.022384]])
+# 'Combined bias (b)' vector from Magneto
 b = np.array([0.027031, -0.040204, 0.046558])
 
 # Read raw data and apply calibration
-rawData = np.genfromtxt('acceldata.txt', delimiter='\t')  # Read raw measurements
+rawData = np.genfromtxt('examples/acceldata-example.txt',
+                        delimiter='\t')  # raw measurement file
+units = 'G\'s' # units of accelerometer measurements (used for axis labels)
 
 N = len(rawData)
 calibData = np.zeros((N, 3), dtype='float')
@@ -44,16 +47,13 @@ for i in range(N):
     currMeas = np.array([rawData[i, 0], rawData[i, 1], rawData[i, 2]])
     calibData[i, :] = A @ (currMeas - b)
 
-# calibData *= 9.80665
-# rawData *= 9.80665
-
 # Plot XY data
 plt.figure()
 plt.plot(rawData[:, 0], rawData[:, 1], 'b*', label='Raw Meas.')
 plt.plot(calibData[:, 0], calibData[:, 1], 'r*', label='Calibrated Meas.')
 plt.title('XY Accelerometer Data')
-plt.xlabel('X [G\'s]')
-plt.ylabel('Y [G\'s]')
+plt.xlabel('X [{}]'.format(units))
+plt.ylabel('Y [{}]'.format(units))
 plt.legend()
 plt.grid()
 plt.axis('equal')
@@ -63,8 +63,8 @@ plt.figure()
 plt.plot(rawData[:, 1], rawData[:, 2], 'b*', label='Raw Meas.')
 plt.plot(calibData[:, 1], calibData[:, 2], 'r*', label='Calibrated Meas.')
 plt.title('YZ Accelerometer Data')
-plt.xlabel('Y [G\'s]')
-plt.ylabel('Z [G\'s]')
+plt.xlabel('Y [{}]'.format(units))
+plt.ylabel('Z [{}]'.format(units))
 plt.legend()
 plt.grid()
 plt.axis('equal')
@@ -74,8 +74,8 @@ plt.figure()
 plt.plot(rawData[:, 0], rawData[:, 2], 'b*', label='Raw Meas.')
 plt.plot(calibData[:, 0], calibData[:, 2], 'r*', label='Calibrated Meas.')
 plt.title('XZ Accelerometer Data')
-plt.xlabel('X [G\'s]')
-plt.ylabel('Z [G\'s]')
+plt.xlabel('X [{}]'.format(units))
+plt.ylabel('Z [{}]'.format(units))
 plt.legend()
 plt.grid()
 plt.axis('equal')
@@ -96,10 +96,9 @@ for i in range(N):
     ax.scatter(xcalib, ycalib, zcalib, color='b', label='Calibrated')
 
 ax.set_title('3D Scatter Plot of Accelerometer Data')
-ax.set_xlabel('X [G\'s]')
-ax.set_ylabel('Y [G\'s]')
-ax.set_zlabel('Z [G\'s]')
+ax.set_xlabel('X [{}]'.format(units))
+ax.set_ylabel('Y [{}]'.format(units))
+ax.set_zlabel('Z [{}]'.format(units))
 ax.legend(['Raw', 'Calibrated'])
-
 
 plt.show()
