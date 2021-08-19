@@ -39,7 +39,7 @@ b = np.array([0.027031, -0.040204, 0.046558])
 # Read raw data and apply calibration
 rawData = np.genfromtxt('examples/acceldata-example.txt',
                         delimiter='\t')  # raw measurement file
-units = 'G\'s' # units of accelerometer measurements (used for axis labels)
+units = 'G\'s'  # units of accelerometer measurements (used for axis labels)
 
 N = len(rawData)
 calibData = np.zeros((N, 3), dtype='float')
