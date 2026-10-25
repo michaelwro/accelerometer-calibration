@@ -6,7 +6,7 @@ VIA MAGNETO
 Code By: Michael Wrona
 Created: 17 Aug 2021
 
-This code reads acceleroemter measurements in G's over a serial connection 
+This code reads accelerometer measurements in G's over a serial connection 
 and logs them to a tab-delimited text file. It also pauses between each 
 reading and averages a few measurements.
 
@@ -14,6 +14,7 @@ reading and averages a few measurements.
 
 import os
 import math
+import argparse
 import pandas
 import serial
 
@@ -40,10 +41,10 @@ class SerialPort:
             port (str): Serial port name. Example: 'COM4'
             baud (int): Serial baud rate, default 9600.
         """
-        if isinstance(port, str) == False:
+        if not isinstance(port, str):
             raise TypeError('port must be a string.')
 
-        if isinstance(baud, int) == False:
+        if not isinstance(baud, int):
             raise TypeError('Baud rate must be an integer.')
 
         self.port = port
@@ -52,8 +53,12 @@ class SerialPort:
         # Initialize serial connection
         self.ser = serial.Serial(
             self.port, self.baud, timeout=None, xonxoff=False, rtscts=False, dsrdtr=False)
-        self.ser.flushInput()
-        self.ser.flushOutput()
+        if hasattr(self.ser, 'reset_input_buffer'):
+            self.ser.reset_input_buffer()
+            self.ser.reset_output_buffer()
+        else:
+            self.ser.flushInput()
+            self.ser.flushOutput()
 
     def Read(self, clean_end=True) -> str:
         """
@@ -65,11 +70,10 @@ class SerialPort:
         Returns:
             (str): utf-8 decoded message.
         """
-        self.ser.flushInput()
         bytesToRead = self.ser.readline()
-        decodedMsg = bytesToRead.decode('utf-8')
+        decodedMsg = bytesToRead.decode('utf-8', errors='replace')
 
-        if clean_end == True:
+        if clean_end:
             decodedMsg = decodedMsg.rstrip()  # Strip extra chars at the end
 
         return decodedMsg
@@ -81,24 +85,40 @@ class SerialPort:
 
 def RecordDataPt(ser: SerialPort) -> tuple:
     """Record data from serial port and return averaged result."""
-    # do a few readings and average the result
-    ax = ay = az = 0.0
+    samples = []
+    max_retries = 10
+    retries = 0
 
-    for _ in range(AVG_MEAS):
-        # read data
+    while len(samples) < AVG_MEAS:
         try:
-            data = ser.Read().split(',')
+            line = ser.Read()
+            data = line.split(',')
+            if len(data) < 3:
+                raise ValueError(f"Expected 3 comma-separated values, got: {line}")
             ax_now = float(data[0])
             ay_now = float(data[1])
             az_now = float(data[2])
-        except:
-            ser.Close()
-            raise SystemExit("[ERROR]: Error reading serial connection.")
-        ax += ax_now
-        ay += ay_now
-        az += az_now
+            samples.append((ax_now, ay_now, az_now))
+        except (ValueError, IndexError):
+            retries += 1
+            if retries > max_retries:
+                ser.Close()
+                raise SystemExit("[ERROR]: Exceeded maximum retries reading serial connection.")
+            continue
 
-    return (ax / AVG_MEAS, ay / AVG_MEAS, az / AVG_MEAS)
+    ax = sum(s[0] for s in samples) / AVG_MEAS
+    ay = sum(s[1] for s in samples) / AVG_MEAS
+    az = sum(s[2] for s in samples) / AVG_MEAS
+
+    # standard deviation
+    std_x = math.sqrt(sum((s[0] - ax)**2 for s in samples) / AVG_MEAS)
+    std_y = math.sqrt(sum((s[1] - ay)**2 for s in samples) / AVG_MEAS)
+    std_z = math.sqrt(sum((s[2] - az)**2 for s in samples) / AVG_MEAS)
+    std_total = math.sqrt(std_x**2 + std_y**2 + std_z**2)
+    if std_total > 0.05:
+        print("[WARNING]: High sensor motion detected during reading (std={:.4f}). Ensure sensor is stationary!".format(std_total))
+
+    return (ax, ay, az)
 
 
 def List2DelimFile(mylist: list, filename: str, delimiter: str = ',', f_mode='a') -> None:
@@ -114,7 +134,13 @@ def List2DelimFile(mylist: list, filename: str, delimiter: str = ',', f_mode='a'
 
 
 def main():
-    ser = SerialPort(SER_PORT, baud=SER_BAUD)
+    parser = argparse.ArgumentParser(description='Record accelerometer measurements for calibration.')
+    parser.add_argument('--port', default=SER_PORT, help='Serial port name (default: %(default)s)')
+    parser.add_argument('--baud', type=int, default=SER_BAUD, help='Serial baud rate (default: %(default)s)')
+    parser.add_argument('--file', default=FILENAME, help='Output text file path (default: %(default)s)')
+    args = parser.parse_args()
+
+    ser = SerialPort(args.port, baud=args.baud)
     data = []  # data list
 
     print('[INFO]: Place sensor level and stationary on desk.')
@@ -123,7 +149,7 @@ def main():
     # take measurements
     for _ in range(MAX_MEAS):
         user = input(
-            '[INPUT]: Ready for measurement? Type \'m\' to measure or \'q\' to save and quit: ').lower()
+            '[INPUT]: Ready for measurement? Type \'m\' to measure or \'q\' to save and quit: ').lower().strip()
         if user == 'm':
             # record data to list
             ax, ay, az = RecordDataPt(ser)
@@ -134,19 +160,16 @@ def main():
         elif user == 'q':
             # save, then quit
             print('[INFO]: Saving data and exiting...')
-            List2DelimFile(data, FILENAME, delimiter='\t')
+            List2DelimFile(data, args.file, delimiter='\t')
             ser.Close()
             print('[INFO]: Done!')
             return
         else:
-            print('[ERROR]: \'{}\' is an unknown input. Terminating!'.format(user))
-            List2DelimFile(data, FILENAME, delimiter='\t')
-            ser.Close()
-            return
+            print('[WARNING]: \'{}\' is an unknown input. Please enter \'m\' to measure or \'q\' to save and quit.'.format(user))
 
     # save once max is reached
     print('[WARNING]: Reached max. number of datapoints, saving file...')
-    List2DelimFile(data, FILENAME, delimiter='\t')
+    List2DelimFile(data, args.file, delimiter='\t')
     ser.Close()
     print('[INFO]: Done!')
 
